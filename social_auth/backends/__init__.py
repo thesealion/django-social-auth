@@ -85,6 +85,9 @@ DEFAULT_USERNAME = _setting('SOCIAL_AUTH_DEFAULT_USERNAME')
 CHANGE_SIGNAL_ONLY = _setting('SOCIAL_AUTH_CHANGE_SIGNAL_ONLY', False)
 UUID_LENGHT = _setting('SOCIAL_AUTH_UUID_LENGTH', 16)
 
+# function that returns True if it knows that the user must be marked as new
+NEW_USER_CHECKER = _setting('SOCIAL_AUTH_NEW_USER_CHECKER', lambda user: False)
+
 
 class SocialAuthBackend(ModelBackend):
     """A django.contrib.auth backend that authenticates the user based on
@@ -156,6 +159,8 @@ class SocialAuthBackend(ModelBackend):
         user = social_user.user
 
         # Flag user "new" status
+        if NEW_USER_CHECKER(user):
+            is_new = True
         setattr(user, 'is_new', is_new)
 
         # Update extra_data storage, unless disabled by setting
