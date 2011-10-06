@@ -67,11 +67,15 @@ def dsa_view(redirect_name=None):
             except Exception, e:  # some error ocurred
                 backend_name = backend.AUTH_BACKEND.name
 
-                logger.error(unicode(e), exc_info=True,
+                try:
+                    exc = unicode(e)
+                except UnicodeDecodeError:
+                    exc = str(e)
+                logger.error(exc, exc_info=True,
                              extra=dict(request=request))
 
                 # Why!?
-                msg = str(e)
+                msg = exc
 
                 if 'django.contrib.messages' in settings.INSTALLED_APPS:
                     from django.contrib.messages.api import error
