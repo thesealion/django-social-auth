@@ -147,8 +147,12 @@ def auth_process(request, backend):
                 redirect = sanitize_redirect(request.get_host(), redirect)
             request.session[REDIRECT_FIELD_NAME] = redirect or DEFAULT_REDIRECT
 
+    backend_obj = getattr(backend, 'AUTH_BACKEND', backend)
+    extra_params = None
+    if backend_obj.name == 'twitter' and request.GET.get('write_access') == '1':
+        extra_params = {'x_auth_access_type': 'write'}
     if backend.uses_redirect:
-        return HttpResponseRedirect(backend.auth_url())
+        return HttpResponseRedirect(backend.auth_url(extra_params))
     else:
         return HttpResponse(backend.auth_html(),
                             content_type='text/html;charset=UTF-8')

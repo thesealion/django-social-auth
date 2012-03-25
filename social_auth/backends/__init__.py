@@ -586,9 +586,9 @@ class ConsumerBasedOAuth(BaseOAuth):
     SETTINGS_KEY_NAME = ''
     SETTINGS_SECRET_NAME = ''
 
-    def auth_url(self):
+    def auth_url(self, extra_params=None):
         """Return redirect url"""
-        token = self.unauthorized_token()
+        token = self.unauthorized_token(extra_params)
         name = self.AUTH_BACKEND.name + 'unauthorized_token_name'
         self.request.session[name] = token.to_string()
         return self.oauth_request(token, self.AUTHORIZATION_URL,
@@ -613,9 +613,10 @@ class ConsumerBasedOAuth(BaseOAuth):
         kwargs.update({'response': data, self.AUTH_BACKEND.name: True})
         return authenticate(*args, **kwargs)
 
-    def unauthorized_token(self):
+    def unauthorized_token(self, extra_params=None):
         """Return request for unauthorized token (first stage)"""
-        request = self.oauth_request(token=None, url=self.REQUEST_TOKEN_URL)
+        request = self.oauth_request(token=None, url=self.REQUEST_TOKEN_URL,
+                                     extra_params=extra_params)
         response = self.fetch_response(request)
         return Token.from_string(response)
 
