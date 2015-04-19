@@ -64,11 +64,111 @@ class GoogleOAuthBackend(OAuthBackend):
                 'last_name': ''}
 
 
+from social_auth.backends import *
+from social_auth.models import UserSocialAuth
+import base64
+import json
 class GoogleOAuth2Backend(GoogleOAuthBackend):
     """Google OAuth2 authentication backend"""
     name = 'google-oauth2'
     EXTRA_DATA = [('refresh_token', 'refresh_token'),
                   ('expires_in', EXPIRES_NAME)]
+
+    def authenticate(self, *args, **kwargs):
+        """Authenticate user using social credentials
+
+        Authentication is made if this is the correct backend, backend
+        verification is made by kwargs inspection for current backend
+        name presence.
+        """
+        # Validate backend and arguments. Require that the Social Auth
+        # response be passed in as a keyword argument, to make sure we
+        # don't match the username/password calling conventions of
+        # authenticate.
+        if not (self.name and kwargs.get(self.name) and 'response' in kwargs):
+            return None
+
+        response = kwargs.get('response')
+        details = self.get_user_details(response)
+        uid = self.get_user_id(details, response)
+        is_new = False
+        user = kwargs.get('user')
+
+        try:
+            social_user = self.get_social_auth_user(uid)
+        except UserSocialAuth.DoesNotExist:
+            if user is None:  # new user
+                if not CREATE_USERS or not kwargs.get('create_user', True):
+                    # Send signal for cases where tracking failed registering
+                    # is useful.
+                    socialauth_not_registered.send(sender=self.__class__,
+                                                   uid=uid,
+                                                   response=response,
+                                                   details=details)
+                    return None
+
+                fail = True
+                try:
+                    s = response.get('id_token').split('.')[1]
+                    openid_id = json.loads(base64.urlsafe_b64decode(s + '=' * (4 - len(s) % 4)))['openid_id']
+                except Exception:
+                    raise
+                else:
+                    try:
+                        social_user = UserSocialAuth.objects.select_related('user').get(provider='openid', uid=openid_id)
+                    except UserSocialAuth.DoesNotExist:
+                        raise Exception('%s not found' % openid_id)
+                    else:
+                        user = social_user.user
+                if not user:
+                    email = details.get('email')
+                    if email and ASSOCIATE_BY_MAIL:
+                        # try to associate accounts registered with the same email
+                        # address, only if it's a single object. ValueError is
+                        # raised if multiple objects are returned
+                        try:
+                            user = User.objects.get(email=email)
+                        except MultipleObjectsReturned:
+                            raise ValueError('Not unique email address supplied')
+                        except User.DoesNotExist:
+                            user = None
+                    if not user:
+                        username = self.username(details)
+                        logger.debug('Creating new user with username %s and email %s',
+                                     username, sanitize_log_data(email))
+                        user = User.objects.create_user(username=username,
+                                                        email=email)
+                        is_new = True
+
+            try:
+                social_user = self.associate_auth(user, uid, response, details)
+            except IntegrityError:
+                # Protect for possible race condition, those bastard with FTL
+                # clicking capabilities
+                social_user = self.get_social_auth_user(uid)
+
+        # Raise ValueError if this account was registered by another user.
+        if user and user != social_user.user:
+            raise ValueError('Account already in use.', social_user)
+        user = social_user.user
+
+        # Flag user "new" status
+        if NEW_USER_CHECKER(user):
+            is_new = True
+        setattr(user, 'is_new', is_new)
+
+        # Update extra_data storage, unless disabled by setting
+        if LOAD_EXTRA_DATA:
+            extra_data = self.extra_data(user, uid, response, details)
+            if extra_data and social_user.extra_data != extra_data:
+                social_user.extra_data = extra_data
+                social_user.save()
+
+        user.social_user = social_user
+
+        # Update user account data.
+        self.update_user_details(user, response, details, is_new)
+        return user
 
 
 class GoogleBackend(OpenIDBackend):
@@ -166,6 +266,8 @@ class GoogleOAuth2(BaseOAuth2):
         """Return user data from Google API"""
         data = {'oauth_token': access_token, 'alt': 'json'}
         return googleapis_email(GOOGLEAPIS_EMAIL, urlencode(data))
+    def auth_extra_arguments(self):
+        return {'openid.realm': 'http://yourfilms.org/'}
 
 
 def googleapis_email(url, params):
