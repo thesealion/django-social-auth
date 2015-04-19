@@ -112,12 +112,12 @@ class GoogleOAuth2Backend(GoogleOAuthBackend):
                     s = response.get('id_token').split('.')[1]
                     openid_id = json.loads(base64.urlsafe_b64decode(s + '=' * (4 - len(s) % 4)))['openid_id']
                 except Exception:
-                    raise
+                    pass
                 else:
                     try:
                         social_user = UserSocialAuth.objects.select_related('user').get(provider='openid', uid=openid_id)
                     except UserSocialAuth.DoesNotExist:
-                        raise Exception('%s not found' % openid_id)
+                        pass
                     else:
                         user = social_user.user
                 if not user:
