@@ -559,8 +559,12 @@ class OpenIdAuth(BaseAuth):
         provider URL."""
         if OPENID_ID_FIELD not in self.data:
             raise ValueError('Missing openid identifier')
-        return self.data[OPENID_ID_FIELD]
-
+        url = self.data[OPENID_ID_FIELD]
+        import re
+        m = re.match(u'http://([a-zA-Z0-9\-_]+).ya.ru/', url)
+        if m:
+            url = u'http://openid.yandex.ru/%s/' % m.group(1)
+        return url
 
 class BaseOAuth(BaseAuth):
     """OAuth base class"""
