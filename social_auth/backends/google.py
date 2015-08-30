@@ -286,10 +286,136 @@ def googleapis_email(url, params):
     except (ValueError, KeyError, IOError):
         return None
 
+class YandexOAuth2Backend(OAuthBackend):
+    name = 'yandex-oauth2'
+
+    def get_user_id(self, details, response):
+        return details['id']
+
+    def get_user_details(self, response):
+        return {'email': response.get('default_email') or
+                         response.get('emails', [''])[0],
+                'id': response['id']}
+
+    #EXTRA_DATA = [('refresh_token', 'refresh_token'),
+    #              ('expires_in', EXPIRES_NAME)]
+
+    def authenticate(self, *args, **kwargs):
+        if not (self.name and kwargs.get(self.name) and 'response' in kwargs):
+            return None
+
+        response = kwargs.get('response')
+        details = self.get_user_details(response)
+        uid = self.get_user_id(details, response)
+        is_new = False
+        user = kwargs.get('user')
+
+        try:
+            social_user = self.get_social_auth_user(uid)
+        except UserSocialAuth.DoesNotExist:
+            if user is None:  # new user
+                if not CREATE_USERS or not kwargs.get('create_user', True):
+                    # Send signal for cases where tracking failed registering
+                    # is useful.
+                    socialauth_not_registered.send(sender=self.__class__,
+                                                   uid=uid,
+                                                   response=response,
+                                                   details=details)
+                    return None
+
+                for openid_id in response.get('openid_identities', []):
+                    try:
+                        social_user = UserSocialAuth.objects.select_related('user').get(provider='openid', uid=openid_id)
+                    except UserSocialAuth.DoesNotExist:
+                        pass
+                    else:
+                        user = social_user.user
+                        break
+                if not user:
+                    email = details.get('email')
+                    if email and ASSOCIATE_BY_MAIL:
+                        # try to associate accounts registered with the same email
+                        # address, only if it's a single object. ValueError is
+                        # raised if multiple objects are returned
+                        try:
+                            user = User.objects.get(email=email)
+                        except MultipleObjectsReturned:
+                            raise ValueError('Not unique email address supplied')
+                        except User.DoesNotExist:
+                            user = None
+                    if not user:
+                        username = self.username(details)
+                        logger.debug('Creating new user with username %s and email %s',
+                                     username, sanitize_log_data(email))
+                        user = User.objects.create_user(username=username,
+                                                        email=email)
+                        is_new = True
+
+            try:
+                social_user = self.associate_auth(user, uid, response, details)
+            except IntegrityError:
+                # Protect for possible race condition, those bastard with FTL
+                # clicking capabilities
+                social_user = self.get_social_auth_user(uid)
+
+        # Raise ValueError if this account was registered by another user.
+        if user and user != social_user.user:
+            raise ValueError('Account already in use.', social_user)
+        user = social_user.user
+
+        # Flag user "new" status
+        if NEW_USER_CHECKER(user):
+            is_new = True
+        setattr(user, 'is_new', is_new)
+
+        # Update extra_data storage, unless disabled by setting
+        if LOAD_EXTRA_DATA:
+            extra_data = self.extra_data(user, uid, response, details)
+            if extra_data and social_user.extra_data != extra_data:
+                social_user.extra_data = extra_data
+                social_user.save()
+
+        user.social_user = social_user
+
+        # Update user account data.
+        self.update_user_details(user, response, details, is_new)
+        return user
+
+class YandexOAuth2(BaseOAuth2):
+    AUTH_BACKEND = YandexOAuth2Backend
+    AUTHORIZATION_URL = 'https://oauth.yandex.com/authorize'
+    ACCESS_TOKEN_URL = 'https://oauth.yandex.com/token'
+    INFO_URL = 'https://login.yandex.ru/info'
+    ACCESS_TOKEN_METHOD = 'POST'
+    REDIRECT_STATE = False
+    SETTINGS_KEY_NAME = 'YANDEX_OAUTH2_CLIENT_KEY'
+    SETTINGS_SECRET_NAME = 'YANDEX_OAUTH2_CLIENT_SECRET'
+
+    def get_user_details(self, response):
+        raise Exception('remove?')
+        return {'email': response.get('default_email') or
+                         response.get('emails', [''])[0]}
+
+    def user_data(self, access_token):
+        params={'oauth_token': access_token, 'format': 'json', 'with_openid_identity': '1'}
+        headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+        request = Request(self.INFO_URL, data=urlencode(params), headers=headers)
+
+        try:
+            response = simplejson.loads(urlopen(request).read())
+        except (ValueError, KeyError):
+            raise ValueError('Unknown OAuth2 response type')
+
+        if response.get('error'):
+            error = response.get('error_description') or response.get('error')
+            raise ValueError('OAuth2 authentication failed: %s' % error)
+        return response
+
 
 # Backend definition
 BACKENDS = {
     'google': GoogleAuth,
     'google-oauth': GoogleOAuth,
     'google-oauth2': GoogleOAuth2,
+    'yandex-oauth2': YandexOAuth2,
 }
