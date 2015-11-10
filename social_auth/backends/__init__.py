@@ -167,6 +167,10 @@ class SocialAuthBackend(ModelBackend):
         if LOAD_EXTRA_DATA:
             extra_data = self.extra_data(user, uid, response, details)
             if extra_data and social_user.extra_data != extra_data:
+                if (social_user.extra_data.get('access_type') == 'write' and
+                        extra_data['access_type'] == 'read'):
+                    extra_data['access_token'] = social_user.extra_data['access_token']
+                    extra_data['access_type'] = 'write'
                 social_user.extra_data = extra_data
                 social_user.save()
 
@@ -593,15 +597,20 @@ class ConsumerBasedOAuth(BaseOAuth):
     def auth_url(self, extra_params=None):
         """Return redirect url"""
         token = self.unauthorized_token(extra_params)
+        access_type = (extra_params or {}).get('x_auth_access_type', 'read')
         name = self.AUTH_BACKEND.name + 'unauthorized_token_name'
-        self.request.session[name] = token.to_string()
+        self.request.session[name] = (token.to_string(), access_type)
         return self.oauth_request(token, self.AUTHORIZATION_URL,
                                   self.auth_extra_arguments()).to_url()
 
     def auth_complete(self, *args, **kwargs):
         """Return user, might be logged in"""
         name = self.AUTH_BACKEND.name + 'unauthorized_token_name'
-        unauthed_token = self.request.session.get(name)
+        try:
+            unauthed_token, access_type = self.request.session.get(name)
+        except ValueError:
+            unauthed_token = self.request.session.get(name)
+            access_type = 'read'
         if not unauthed_token:
             raise ValueError('Missing unauthorized token')
 
@@ -613,6 +622,7 @@ class ConsumerBasedOAuth(BaseOAuth):
         data = self.user_data(access_token)
         if data is not None:
             data['access_token'] = access_token.to_string()
+            data['access_type'] = access_type
 
         kwargs.update({'response': data, self.AUTH_BACKEND.name: True})
         return authenticate(*args, **kwargs)

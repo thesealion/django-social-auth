@@ -32,7 +32,8 @@ TWITTER_CHECK_AUTH = 'https://%s/1.1/account/verify_credentials.json' % TWITTER_
 class TwitterBackend(OAuthBackend):
     """Twitter OAuth authentication backend"""
     name = 'twitter'
-    EXTRA_DATA = [('id', 'id'), ('screen_name', 'screen_name')]
+    EXTRA_DATA = [('id', 'id'), ('screen_name', 'screen_name'),
+                  ('access_type', 'access_type')]
 
     def get_user_details(self, response):
         """Return user details from Twitter account"""
