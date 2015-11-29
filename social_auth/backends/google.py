@@ -266,8 +266,6 @@ class GoogleOAuth2(BaseOAuth2):
         """Return user data from Google API"""
         data = {'oauth_token': access_token, 'alt': 'json'}
         return googleapis_email(GOOGLEAPIS_EMAIL, urlencode(data))
-    def auth_extra_arguments(self):
-        return {'openid.realm': 'http://yourfilms.org/'}
 
 
 def googleapis_email(url, params):
