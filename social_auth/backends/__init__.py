@@ -167,7 +167,7 @@ class SocialAuthBackend(ModelBackend):
         if LOAD_EXTRA_DATA:
             extra_data = self.extra_data(user, uid, response, details)
             if extra_data and social_user.extra_data != extra_data:
-                if (social_user.extra_data.get('access_type') == 'write' and
+                if (social_user.extra_data and social_user.extra_data.get('access_type') == 'write' and
                         extra_data['access_type'] == 'read'):
                     extra_data['access_token'] = social_user.extra_data['access_token']
                     extra_data['access_type'] = 'write'
