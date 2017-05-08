@@ -14,12 +14,11 @@ field, check OAuthBackend class for details on how to extend it.
 import logging
 logger = logging.getLogger(__name__)
 
-import cgi
 from urllib import urlencode
 from urllib2 import urlopen
 
 from django.conf import settings
-from django.utils import simplejson
+import json
 from django.contrib.auth import authenticate
 
 from social_auth.backends import BaseOAuth2, OAuthBackend, USERNAME
@@ -45,7 +44,6 @@ class FacebookBackend(OAuthBackend):
                 'last_name': response.get('last_name', '')}
 
 
-
 class FacebookAuth(BaseOAuth2):
     """Facebook OAuth2 support"""
     AUTH_BACKEND = FacebookBackend
@@ -60,10 +58,10 @@ class FacebookAuth(BaseOAuth2):
 
     def user_data(self, access_token):
         """Loads user data from service"""
-        params = {'access_token': access_token,}
+        params = {'access_token': access_token}
         url = 'https://graph.facebook.com/me?' + urlencode(params)
         try:
-            data = simplejson.load(urlopen(url))
+            data = json.load(urlopen(url))
             logger.debug('Found user data for token %s',
                          sanitize_log_data(access_token),
                          extra=dict(data=data))
@@ -83,8 +81,8 @@ class FacebookAuth(BaseOAuth2):
                              'redirect_uri': self.redirect_uri,
                              'client_secret': settings.FACEBOOK_API_SECRET,
                              'code': self.data['code']})
-            response = cgi.parse_qs(urlopen(url).read())
-            access_token = response['access_token'][0]
+            response = json.loads(urlopen(url).read())
+            access_token = response['access_token']
             data = self.user_data(access_token)
             if data is not None:
                 if 'error' in data:
@@ -94,7 +92,7 @@ class FacebookAuth(BaseOAuth2):
                 # expires will not be part of response if offline access
                 # premission was requested
                 if 'expires' in response:
-                    data['expires'] = response['expires'][0]
+                    data['expires'] = response['expires']
             kwargs.update({'response': data, self.AUTH_BACKEND.name: True})
             return authenticate(*args, **kwargs)
         else:

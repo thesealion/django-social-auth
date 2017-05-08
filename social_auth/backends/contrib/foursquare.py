@@ -3,7 +3,7 @@ logger = logging.getLogger(__name__)
 
 import urllib
 
-from django.utils import simplejson
+import json
 
 from social_auth.backends import BaseOAuth2, OAuthBackend, USERNAME
 
@@ -46,7 +46,7 @@ class FoursquareAuth(BaseOAuth2):
         params = {'oauth_token': access_token,}
         url = FOURSQUARE_CHECK_AUTH + '?' + urllib.urlencode(params)
         try:
-            return simplejson.load(urllib.urlopen(url))
+            return json.load(urllib.urlopen(url))
         except ValueError:
             return None
 

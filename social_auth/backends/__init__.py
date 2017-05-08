@@ -12,6 +12,7 @@ enabled.
 import logging
 logger = logging.getLogger(__name__)
 
+import json
 from os import walk
 from os.path import basename
 from uuid import uuid4
@@ -30,8 +31,7 @@ from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned
 from django.contrib.auth import authenticate
 from django.contrib.auth.backends import ModelBackend
-from django.utils import simplejson
-from django.utils.importlib import import_module
+from importlib import import_module
 from django.db.utils import IntegrityError
 
 from social_auth.models import UserSocialAuth
@@ -728,7 +728,7 @@ class BaseOAuth2(BaseOAuth):
                           headers=headers)
 
         try:
-            response = simplejson.loads(urlopen(request).read())
+            response = json.loads(urlopen(request).read())
         except (ValueError, KeyError):
             raise ValueError('Unknown OAuth2 response type')
 

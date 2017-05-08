@@ -18,7 +18,7 @@ import cgi
 import urllib
 
 from django.conf import settings
-from django.utils import simplejson
+import json
 from django.contrib.auth import authenticate
 
 from social_auth.backends import BaseOAuth, OAuthBackend, USERNAME
@@ -87,7 +87,7 @@ class GithubAuth(BaseOAuth):
         params = {'access_token': access_token}
         url = GITHUB_API_URL + '/user?' + urllib.urlencode(params)
         try:
-            return simplejson.load(urllib.urlopen(url))
+            return json.load(urllib.urlopen(url))
         except ValueError:
             return None
 

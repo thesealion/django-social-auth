@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 import urllib
 
 from django.conf import settings
-from django.utils import simplejson
+import json
 
 from social_auth.backends import OAuthBackend, USERNAME
 from social_auth.backends.google import BaseGoogleOAuth
@@ -69,7 +69,7 @@ class OrkutAuth(BaseGoogleOAuth):
         request = self.oauth_request(access_token, ORKUT_REST_ENDPOINT, params)
         response = urllib.urlopen(request.to_url()).read()
         try:
-            return simplejson.loads(response)['data']
+            return json.loads(response)['data']
         except (ValueError, KeyError):
             return None
 

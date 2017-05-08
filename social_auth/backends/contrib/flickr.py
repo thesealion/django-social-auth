@@ -16,7 +16,6 @@ except ImportError:
     from cgi import parse_qs
 
 from django.conf import settings
-from django.utils import simplejson
 
 from oauth2 import Token
 from social_auth.backends import ConsumerBasedOAuth, OAuthBackend, USERNAME

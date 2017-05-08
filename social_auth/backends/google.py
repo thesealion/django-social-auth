@@ -20,7 +20,7 @@ from urllib import urlencode
 from urllib2 import Request, urlopen
 
 from django.conf import settings
-from django.utils import simplejson
+import json
 
 from social_auth.backends import OpenIdAuth, ConsumerBasedOAuth, BaseOAuth2, \
                                  OAuthBackend, OpenIDBackend, USERNAME
@@ -280,7 +280,7 @@ def googleapis_email(url, params):
     """
     request = Request(url + '?' + params, headers={'Authorization': params})
     try:
-        return simplejson.loads(urlopen(request).read())['data']
+        return json.loads(urlopen(request).read())['data']
     except (ValueError, KeyError, IOError):
         return None
 
@@ -400,7 +400,7 @@ class YandexOAuth2(BaseOAuth2):
         request = Request(self.INFO_URL, data=urlencode(params), headers=headers)
 
         try:
-            response = simplejson.loads(urlopen(request).read())
+            response = json.loads(urlopen(request).read())
         except (ValueError, KeyError):
             raise ValueError('Unknown OAuth2 response type')
 
