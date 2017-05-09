@@ -128,7 +128,7 @@ def associate_complete(request, backend, *args, **kwargs):
 def disconnect(request, backend, association_id=None):
     """Disconnects given backend from current logged in user."""
     backend.disconnect(request.user, association_id)
-    url = request.REQUEST.get(REDIRECT_FIELD_NAME, '') or \
+    url = request.GET.get(REDIRECT_FIELD_NAME, '') or request.POST.get(REDIRECT_FIELD_NAME, '') or \
           DISCONNECT_REDIRECT_URL or \
           DEFAULT_REDIRECT
     return HttpResponseRedirect(url)
@@ -137,7 +137,7 @@ def disconnect(request, backend, association_id=None):
 def auth_process(request, backend):
     """Authenticate using social backend"""
     # Save any defined redirect_to value into session
-    if REDIRECT_FIELD_NAME in request.REQUEST:
+    if REDIRECT_FIELD_NAME in request.GET or REDIRECT_FIELD_NAME in request.POST:
         data = request.POST if request.method == 'POST' else request.GET
         if REDIRECT_FIELD_NAME in data:
             # Check and sanitize a user-defined GET/POST redirect_to field value.

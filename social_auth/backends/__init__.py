@@ -431,7 +431,7 @@ class BaseAuth(object):
         self.request = request
         # Use request because some auth providers use POST urls with needed
         # GET parameters on it
-        self.data = request.REQUEST
+        self.data = dict(request.GET.dict(), **request.POST.dict())
         self.redirect = redirect
 
     def auth_url(self):
@@ -616,7 +616,10 @@ class ConsumerBasedOAuth(BaseOAuth):
 
         token = Token.from_string(unauthed_token)
         if token.key != self.data.get('oauth_token', 'no-token'):
-            raise ValueError('Incorrect tokens')
+            raise ValueError(
+                'Incorrect tokens, %s != %s (%s, %s)',
+                (token.key, self.data.get('oauth_token', 'no-token'), self.request.GET.get('oauth_token'), self.request.POST.get('oauth_token'))
+            )
 
         access_token = self.access_token(token)
         data = self.user_data(access_token)
